@@ -10,7 +10,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
  if (!authorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
  const body = await req.json().catch(() => null);
- if (!body || !/^\\d{4}-\\d{2}-\\d{2}$/.test(body.id || '')) return NextResponse.json({ error: 'ID jadwal tidak valid.' }, { status: 400 });
+ if (!body || !/^\d{4}-\d{2}-\d{2}$/.test(body.id || '')) return NextResponse.json({ error: 'ID jadwal tidak valid.' }, { status: 400 });
  const { error } = await db().from('shopee_runs').update({ status: 'opened_by_user', message: 'Pengguna menekan tombol buka tautan. Status check-in Shopee tidak diverifikasi.' }).eq('scheduled_for', body.id);
  if (error) return NextResponse.json({ error: 'Gagal memperbarui riwayat.' }, { status: 500 });
  return NextResponse.json({ ok: true, note: 'Pembukaan tautan dicatat; check-in tidak diverifikasi.' });
