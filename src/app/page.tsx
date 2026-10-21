@@ -1,0 +1,23 @@
+'use client';
+import { useCallback, useEffect, useState } from 'react';
+type Schedule = { enabled: boolean; local_time: string; timezone: string; target_url: string };
+type Run = { id: number; scheduled_for: string; status: string; message: string; created_at: string };
+const target = 'https://shopee.co.id/koin-shopee';
+export default function Home() {
+ const [token,setToken]=useState(''); const [schedule,setSchedule]=useState<Schedule>({enabled:true,local_time:'08:00',timezone:'Asia/Jakarta',target_url:target}); const [runs,setRuns]=useState<Run[]>([]); const [message,setMessage]=useState('Masukkan token admin untuk mengelola jadwal.'); const [busy,setBusy]=useState(false);
+ const headers = { 'Content-Type':'application/json', Authorization:`Bearer ${token}` };
+ const refresh=useCallback(async()=>{ if(!token)return; try { const [c,r]=await Promise.all([fetch('/api/config',{headers,cache:'no-store'}),fetch('/api/runs',{headers,cache:'no-store'})]); if(c.status===401||r.status===401){setMessage('Token admin tidak valid.');return;} const cd=await c.json(),rd=await r.json(); if(!c.ok||!r.ok)throw new Error(cd.error||rd.error||'Gagal memuat data.'); setSchedule(cd.schedule);setRuns(rd.runs||[]);setMessage('Terhubung. Jadwal tersimpan di database.'); } catch(e){setMessage(e instanceof Error?e.message:'Koneksi gagal.');}},[token]);
+ useEffect(()=>{void refresh()},[refresh]);
+ async function save(){setBusy(true);try{const res=await fetch('/api/config',{method:'PUT',headers,body:JSON.stringify(schedule)});const data=await res.json();if(!res.ok)throw new Error(data.error||'Gagal menyimpan.');setSchedule(data.schedule);setMessage('Jadwal berhasil disimpan ke database.');await refresh()}catch(e){setMessage(e instanceof Error?e.message:'Gagal menyimpan.')}finally{setBusy(false)}}
+ async function openShopee(run?:Run){window.open(target,'_blank','noopener,noreferrer');if(run&&token){await fetch('/api/runs',{method:'POST',headers,body:JSON.stringify({id:run.scheduled_for})}).catch(()=>undefined);await refresh()}}
+ return <main className="shell"><header className="top"><div className="mark">SC</div><div><p className="eyebrow">AUTOMATION WORKSPACE</p><h1>Shopee Auto Console</h1><p className="sub">Jadwalkan dan pantau tugas pembukaan halaman Koin Shopee.</p></div><span className="pill">Vercel + Supabase</span></header>
+ <section className="notice"><strong>Perlu diketahui</strong><p>Vercel Cron berjalan di server, bukan di browser perangkatmu. Console ini menyimpan jadwal dan mencatat tugas harian; halaman Shopee tidak dapat dipaksa terbuka saat browser tertutup. Check-in atau koin terkumpul tidak diklaim berhasil tanpa verifikasi.</p></section>
+ <div className="grid"><section className="panel"><div className="panelhead"><div><p className="eyebrow">KONFIGURASI</p><h2>Jadwal otomatis</h2></div><span className={schedule.enabled?'dot on':'dot'}/></div>
+ <label>Token admin<input type="password" autoComplete="current-password" placeholder="Masukkan ADMIN_TOKEN" value={token} onChange={e=>setToken(e.target.value)}/></label>
+ <label className="toggle"><span><b>Aktifkan jadwal</b><small>Catat tugas sekali sehari</small></span><input type="checkbox" checked={schedule.enabled} onChange={e=>setSchedule({...schedule,enabled:e.target.checked})}/></label>
+ <label>Jadwal harian<input value="08:00 WIB · setiap hari" readOnly/></label><label>URL target<input value={target} readOnly/></label>
+ <div className="actions"><button className="primary" disabled={!token||busy} onClick={save}>{busy?'Menyimpan…':'Simpan jadwal'}</button><button className="secondary" onClick={()=>void openShopee()}>Buka Shopee sekarang ↗</button></div><p className="status" role="status">{message}</p></section>
+ <section className="panel"><div className="panelhead"><div><p className="eyebrow">RIWAYAT</p><h2>Eksekusi terbaru</h2></div><button className="iconbtn" onClick={()=>void refresh()} aria-label="Muat ulang">↻</button></div>
+ {runs.length===0?<div className="empty"><div className="emptyicon">⌁</div><b>Belum ada tugas tercatat</b><p>Riwayat akan muncul setelah endpoint jadwal dipanggil.</p></div>:<div className="runs">{runs.map(run=><article className="run" key={run.id}><div><b>{run.scheduled_for}</b><small>{new Date(run.created_at).toLocaleString('id-ID')}</small><p>{run.message}</p></div><div className="runend"><span className="tag">{run.status==='opened_by_user'?'Dibuka manual':'Menunggu browser'}</span>{run.status!=='opened_by_user'&&<button className="secondary small" onClick={()=>void openShopee(run)}>Buka ↗</button>}</div></article>)}</div>}</section></div>
+ <footer>Console hanya mengelola jadwal dan tautan. Tidak menyimpan kata sandi Shopee, melewati CAPTCHA, atau mengklaim hasil check-in.</footer></main>;
+}
